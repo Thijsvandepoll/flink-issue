@@ -1,0 +1,44 @@
+name: flink-issue
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:14
+    restart: always
+    environment:
+      POSTGRES_PASSWORD: root
+      POSTGRES_USER: root
+    ports:
+      - 5432:5432
+    networks:
+      - postgres-network
+    volumes:
+      - ./postgresql.conf:/etc/postgresql.conf:ro,z
+    command: ["postgres", "-c", "config_file=/etc/postgresql.conf"]
+
+  postgres-init:
+    image: jbergknoff/postgresql-client
+    container_name: postgres-init
+    entrypoint:
+      - /bin/sh
+      - -c
+    command:
+      - |
+        until nc -z postgres 5432 &>/dev/null; do sleep 3; echo "Waiting for Postgres to come up"; done
+        PGPASSWORD=root psql --host=postgres --user=root <<EOF
+          create database flink_issue;
+          \c flink_issue
+          create schema flink_schema;
+          grant all privileges on database flink_issue to root;
+        
+          create table flink_schema.flink_table (p_key INT NOT NULL PRIMARY KEY, modified_id INT NOT NULL, content XML);
+          insert into flink_schema.flink_table values (1, 1, '<root>Some text content</root>'), (2, 1, '<root>Some other text content</root>'), (3, 1, '<root>Some more text content</root>');
+          alter table flink_schema.flink_table replica identity full;
+        EOF
+        exec nc -lk -p 9999 -e true
+    networks:
+      - postgres-network
+
+networks:
+  postgres-network:
+    driver: bridge

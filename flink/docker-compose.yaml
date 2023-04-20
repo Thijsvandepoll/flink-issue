@@ -1,0 +1,63 @@
+name: flink-issue
+
+services:
+  jobmanager:
+    container_name: jobmanager
+    user: flink:flink
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    volumes:
+      - ./src:/opt/flink/src
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+    restart: always
+    networks:
+      - flink-network
+
+  taskmanager:
+    container_name: taskmanager
+    user: flink:flink
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      - jobmanager
+    command: taskmanager
+    volumes:
+      - ./src:/opt/flink/src
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        taskmanager.numberOfTaskSlots: 2
+    restart: always
+    networks:
+      - flink-network
+
+  job-client:
+    container_name: job-client
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: tail -f /dev/null
+    volumes:
+      - ./src:/opt/flink/src
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: jobmanager
+        rest.address: jobmanager
+    depends_on:
+      - jobmanager
+    networks:
+      - flink-network
+
+networks:
+  flink-network:
+    driver: bridge
